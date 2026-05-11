@@ -1,2 +1,4 @@
 /target
 /shader/target
+/rust-gpu
+/.claude
