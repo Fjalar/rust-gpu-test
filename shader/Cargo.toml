@@ -1,0 +1,14 @@
+[package]
+name = "shader"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(target_arch, values("spirv"))'] }
+
+[dependencies]
+spirv-std = { path = "../rust-gpu/crates/spirv-std" }

@@ -1,0 +1,19 @@
+[package]
+name = "rust-gpu-test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wgpu = { version = "27.0.1", features = ["spirv"] }
+pollster = "0.4"
+bytemuck = "1.16"
+
+[build-dependencies]
+spirv-builder = { path = "rust-gpu/crates/spirv-builder", default-features = false, features = ["use-compiled-tools"] }
+
+# Compile build-dependencies in release-ish mode so rustc_codegen_spirv isn't dog slow.
+[profile.dev.build-override]
+opt-level = 3
+[profile.release.build-override]
+opt-level = 3
+codegen-units = 16
