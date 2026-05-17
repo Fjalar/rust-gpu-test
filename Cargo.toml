@@ -2,6 +2,7 @@
 name = "rust-gpu-test"
 version = "0.1.0"
 edition = "2024"
+default-run = "rust-gpu-test"
 
 [dependencies]
 wgpu = { version = "27.0.1", features = ["spirv"] }

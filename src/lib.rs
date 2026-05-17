@@ -1,10 +1,20 @@
 use std::sync::Arc;
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::window::{Window, WindowId};
+
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, EventLoop},
+    window::{Window, WindowId},
+};
 
 const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
+
+pub fn run() {
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let mut app = App::default();
+    event_loop.run_app(&mut app).unwrap();
+}
 
 struct Gpu {
     window: Arc<Window>,
@@ -122,6 +132,11 @@ async fn init(window: Arc<Window>) -> Gpu {
         .await
         .expect("no device");
 
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("shader"),
+        source: wgpu::util::make_spirv(SHADER),
+    });
+
     let size = window.inner_size();
     let mut config = surface
         .get_default_config(&adapter, size.width.max(1), size.height.max(1))
@@ -129,10 +144,6 @@ async fn init(window: Arc<Window>) -> Gpu {
     config.present_mode = wgpu::PresentMode::AutoVsync;
     surface.configure(&device, &config);
 
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("triangle"),
-        source: wgpu::util::make_spirv(SHADER),
-    });
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[],
@@ -177,10 +188,4 @@ async fn init(window: Arc<Window>) -> Gpu {
         config,
         pipeline,
     }
-}
-
-fn main() {
-    let event_loop = EventLoop::new().unwrap();
-    let mut app = App::default();
-    event_loop.run_app(&mut app).unwrap();
 }
