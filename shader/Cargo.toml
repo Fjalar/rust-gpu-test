@@ -11,4 +11,4 @@ crate-type = ["rlib", "cdylib"]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(target_arch, values("spirv"))'] }
 
 [dependencies]
-spirv-std = { path = "../rust-gpu/crates/spirv-std" }
+spirv-std = "0.10.0-alpha.1"

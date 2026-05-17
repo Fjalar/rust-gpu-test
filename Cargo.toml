@@ -10,7 +10,7 @@ bytemuck = "1.16"
 winit = "0.30"
 
 [build-dependencies]
-spirv-builder = { path = "rust-gpu/crates/spirv-builder", default-features = false, features = ["use-compiled-tools"] }
+spirv-builder = { version = "0.10.0-alpha.1", default-features = false, features = ["use-compiled-tools"] }
 
 # Compile build-dependencies in release-ish mode so rustc_codegen_spirv isn't dog slow.
 [profile.dev.build-override]
