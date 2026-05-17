@@ -3,7 +3,7 @@ use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop},
     window::{Window, WindowId},
 };
 
@@ -11,7 +11,7 @@ const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
 
 pub fn run() {
     let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    event_loop.set_control_flow(Poll);
     let mut app = App::default();
     event_loop.run_app(&mut app).unwrap();
 }
