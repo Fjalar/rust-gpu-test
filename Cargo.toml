@@ -5,10 +5,10 @@ edition = "2024"
 default-run = "rust-gpu-test"
 
 [dependencies]
-wgpu = { version = "27.0.1", features = ["spirv"] }
-pollster = "0.4"
-bytemuck = "1.16"
-winit = "0.30"
+wgpu = { version = "29.0.3", features = ["spirv"] }
+pollster = "0.4.0"
+bytemuck = "1.25.0"
+winit = "0.30.13"
 
 [build-dependencies]
 spirv-builder = { version = "0.10.0-alpha.1", default-features = false, features = ["use-compiled-tools"] }

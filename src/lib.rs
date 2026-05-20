@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use wgpu::CurrentSurfaceTexture;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{KeyEvent, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow::Poll, EventLoop},
+    keyboard::{Key, NamedKey},
     window::{Window, WindowId},
 };
 
@@ -17,6 +19,7 @@ pub fn run() {
 }
 
 struct Gpu {
+    instance: wgpu::Instance,
     window: Arc<Window>,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -43,7 +46,7 @@ impl ApplicationHandler for App {
             )
             .unwrap(),
         );
-        self.gpu = Some(pollster::block_on(init(window)));
+        self.gpu = Some(pollster::block_on(init(window, el)));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -68,13 +71,40 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let frame = match gpu.surface.get_current_texture() {
-                    Ok(f) => f,
-                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                        gpu.surface.configure(&gpu.device, &gpu.config);
+                    CurrentSurfaceTexture::Success(frame) => frame,
+                    CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => {
+                        // Try again later
+                        if let Some(gpu) = &self.gpu {
+                            gpu.window.request_redraw();
+                        }
                         return;
                     }
-                    Err(e) => {
-                        eprintln!("surface error: {e:?}");
+                    CurrentSurfaceTexture::Suboptimal(texture) => {
+                        drop(texture);
+
+                        if let Some(gpu) = &self.gpu {
+                            gpu.surface.configure(&gpu.device, &gpu.config);
+                            gpu.window.request_redraw();
+                        }
+
+                        return;
+                    }
+                    CurrentSurfaceTexture::Outdated => {
+                        if let Some(gpu) = &self.gpu {
+                            gpu.surface.configure(&gpu.device, &gpu.config);
+                            gpu.window.request_redraw();
+                        }
+                        return;
+                    }
+                    CurrentSurfaceTexture::Validation => {
+                        unreachable!("No error scope registered, so validation errors will panic")
+                    }
+                    CurrentSurfaceTexture::Lost => {
+                        if let Some(gpu) = &mut self.gpu {
+                            gpu.surface = gpu.instance.create_surface(gpu.window.clone()).unwrap();
+                            gpu.surface.configure(&gpu.device, &gpu.config);
+                            gpu.window.request_redraw();
+                        }
                         return;
                     }
                 };
@@ -115,11 +145,10 @@ impl ApplicationHandler for App {
     }
 }
 
-async fn init(window: Arc<Window>) -> Gpu {
-    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::PRIMARY,
-        ..Default::default()
-    });
+async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle_from_env(
+        Box::new(el.owned_display_handle()),
+    ));
     let surface = instance.create_surface(window.clone()).unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -155,7 +184,7 @@ async fn init(window: Arc<Window>) -> Gpu {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[],
-        push_constant_ranges: &[],
+        immediate_size: 0,
     });
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
@@ -184,11 +213,12 @@ async fn init(window: Arc<Window>) -> Gpu {
             })],
             compilation_options: Default::default(),
         }),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     });
 
     Gpu {
+        instance,
         window,
         surface,
         device,
