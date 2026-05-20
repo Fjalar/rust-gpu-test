@@ -51,7 +51,15 @@ impl ApplicationHandler for App {
             return;
         };
         match event {
-            WindowEvent::CloseRequested => el.exit(),
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: Key::Named(NamedKey::Escape),
+                        ..
+                    },
+                ..
+            }
+            | WindowEvent::CloseRequested => el.exit(),
             WindowEvent::Resized(size) if size.width > 0 && size.height > 0 => {
                 gpu.config.width = size.width;
                 gpu.config.height = size.height;
