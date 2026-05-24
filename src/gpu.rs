@@ -10,6 +10,7 @@ const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
 pub(crate) struct CameraUniform {
     pub(crate) x: u32,
     pub(crate) y: u32,
+    pub(crate) t: f32,
 }
 
 pub(crate) struct Gpu {
@@ -23,9 +24,16 @@ pub(crate) struct Gpu {
     pub(crate) camera_buffer: wgpu::Buffer,
     pub(crate) camera_bind_group: wgpu::BindGroup,
     pub(crate) camera_uniform: CameraUniform,
+    pub(crate) start_timestamp: std::time::Instant,
 }
 impl Gpu {
     pub(crate) fn render(&mut self) {
+        self.camera_uniform.t = self.start_timestamp.elapsed().as_secs_f32();
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
         let frame = match self.surface.get_current_texture() {
             CurrentSurfaceTexture::Success(frame) => frame,
             CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => {
@@ -131,6 +139,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     let camera_uniform = CameraUniform {
         x: size.width,
         y: size.height,
+        t: 0.0,
     };
 
     let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -210,5 +219,6 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         camera_bind_group,
         camera_buffer,
         camera_uniform,
+        start_timestamp: std::time::Instant::now(),
     }
 }

@@ -59,6 +59,13 @@ impl ApplicationHandler for App {
                 gpu.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
+                gpu.camera_uniform.t = gpu.start_timestamp.elapsed().as_secs_f32();
+                gpu.queue.write_buffer(
+                    &gpu.camera_buffer,
+                    0,
+                    bytemuck::cast_slice(&[gpu.camera_uniform]),
+                );
+                gpu.window.request_redraw();
                 gpu.render();
             }
             _ => {}
