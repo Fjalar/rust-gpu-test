@@ -87,6 +87,7 @@ impl Gpu {
             rpass.draw(0..3, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
+        self.window.pre_present_notify();
         frame.present();
     }
 }
