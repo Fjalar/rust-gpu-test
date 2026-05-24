@@ -1,11 +1,17 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
 
-use spirv_std::glam::{Vec4, vec4};
+use spirv_std::glam::{vec4, Vec3, Vec4};
 use spirv_std::spirv;
 
 pub struct Camera {
     x: u32,
     y: u32,
+}
+
+pub struct Triangle {
+    a: Vec3,
+    b: Vec3,
+    c: Vec3,
 }
 
 #[spirv(fragment)]
@@ -14,9 +20,23 @@ pub fn main_fs(
     #[spirv(uniform, descriptor_set = 0, binding = 0)] camera: &Camera,
     output: &mut Vec4,
 ) {
-    let r = pos.x / camera.x as f32;
-    let g = pos.y / camera.y as f32;
-    *output = vec4(r, g, 0.0, 1.0);
+    let half_w = camera.x as f32 / 2.0;
+    let half_h = camera.y as f32 / 2.0;
+    let origin = Vec3::new(pos.x - half_w, pos.y - half_h, 0.0);
+    let ray = Vec3::new(0.0, 0.0, 1.0);
+
+    let triangle = Triangle {
+        a: Vec3::new(0.0, -200.0, 1.0),
+        b: Vec3::new(200.0, 200.0, 1.0),
+        c: Vec3::new(-200.0, 200.0, 1.0),
+    };
+
+    let intersection_point = moller_trumbore_intersection(origin, ray, triangle);
+    if intersection_point != Vec3::ZERO {
+        *output = vec4(1.0, 1.0, 1.0, 1.0);
+    } else {
+        *output = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }
 
 #[spirv(vertex)]
@@ -30,4 +50,41 @@ pub fn main_vs(
         vec4(-1.0, -3.0, 0.0, 1.0),
     ];
     *out_pos = positions[(vert_id) as usize];
+}
+
+// https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm#Rust_implementation
+fn moller_trumbore_intersection(origin: Vec3, direction: Vec3, triangle: Triangle) -> Vec3 {
+    let e1 = triangle.b - triangle.a;
+    let e2 = triangle.c - triangle.a;
+
+    let ray_cross_e2 = direction.cross(e2);
+    let det = e1.dot(ray_cross_e2);
+
+    if det > -f32::EPSILON && det < f32::EPSILON {
+        return Vec3::ZERO; // This ray is parallel to this triangle.
+    }
+
+    let inv_det = 1.0 / det;
+    let s = origin - triangle.a;
+    let u = inv_det * s.dot(ray_cross_e2);
+    if u < 0.0 || u > 1.0 {
+        return Vec3::ZERO;
+    }
+
+    let s_cross_e1 = s.cross(e1);
+    let v = inv_det * direction.dot(s_cross_e1);
+    if v < 0.0 || u + v > 1.0 {
+        return Vec3::ZERO;
+    }
+    // At this stage we can compute t to find out where the intersection point is on the line.
+    let t = inv_det * e2.dot(s_cross_e1);
+
+    if t > f32::EPSILON {
+        // ray intersection
+        let intersection_point = origin + direction * t;
+        return intersection_point;
+    } else {
+        // This means that there is a line intersection but not a ray intersection.
+        return Vec3::ZERO;
+    }
 }
