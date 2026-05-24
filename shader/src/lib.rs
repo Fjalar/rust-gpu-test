@@ -3,10 +3,19 @@
 use spirv_std::glam::{Vec4, vec4};
 use spirv_std::spirv;
 
+pub struct Camera {
+    x: u32,
+    y: u32,
+}
+
 #[spirv(fragment)]
-pub fn main_fs(#[spirv(frag_coord)] pos: Vec4, output: &mut Vec4) {
-    let r = pos.x / 800.0;
-    let g = pos.y / 600.0;
+pub fn main_fs(
+    #[spirv(frag_coord)] pos: Vec4,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] camera: &Camera,
+    output: &mut Vec4,
+) {
+    let r = pos.x / camera.x as f32;
+    let g = pos.y / camera.y as f32;
     *output = vec4(r, g, 0.0, 1.0);
 }
 
