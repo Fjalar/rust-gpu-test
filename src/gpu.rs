@@ -1,17 +1,11 @@
 use std::sync::Arc;
 
-use wgpu::{CurrentSurfaceTexture, util::DeviceExt};
+use wgpu::{BindGroup, CurrentSurfaceTexture, util::DeviceExt};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
-const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
+use crate::params::Params;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct CameraUniform {
-    pub(crate) x: u32,
-    pub(crate) y: u32,
-    pub(crate) t: f32,
-}
+const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
 
 pub(crate) struct Gpu {
     pub(crate) instance: wgpu::Instance,
@@ -21,19 +15,19 @@ pub(crate) struct Gpu {
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
     pub(crate) pipeline: wgpu::RenderPipeline,
-    pub(crate) camera_buffer: wgpu::Buffer,
-    pub(crate) camera_bind_group: wgpu::BindGroup,
-    pub(crate) camera_uniform: CameraUniform,
+    pub(crate) display_uniform: [u32; 2],
+    pub(crate) display_buffer: wgpu::Buffer,
+    pub(crate) display_bind_group: BindGroup,
+    pub(crate) params: Params,
+    pub(crate) params_buffer: wgpu::Buffer,
+    pub(crate) params_bind_group: wgpu::BindGroup,
     pub(crate) start_timestamp: std::time::Instant,
 }
 impl Gpu {
     pub(crate) fn render(&mut self) {
-        self.camera_uniform.t = self.start_timestamp.elapsed().as_secs_f32();
-        self.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[self.camera_uniform]),
-        );
+        self.params.t = self.start_timestamp.elapsed().as_secs_f32();
+        self.queue
+            .write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
         let frame = match self.surface.get_current_texture() {
             CurrentSurfaceTexture::Success(frame) => frame,
             CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Occluded => {
@@ -91,7 +85,8 @@ impl Gpu {
                 ..Default::default()
             });
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.camera_bind_group, &[]);
+            rpass.set_bind_group(0, &self.display_bind_group, &[]);
+            rpass.set_bind_group(1, &self.params_bind_group, &[]);
             rpass.draw(0..3, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
@@ -136,19 +131,16 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     config.present_mode = wgpu::PresentMode::AutoVsync;
     surface.configure(&device, &config);
 
-    let camera_uniform = CameraUniform {
-        x: size.width,
-        y: size.height,
-        t: 0.0,
-    };
+    // Begin: display
+    let display_uniform = [size.width, size.height];
 
-    let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Camera Buffer"),
-        contents: bytemuck::cast_slice(&[camera_uniform]),
+    let display_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Display Buffer"),
+        contents: bytemuck::cast_slice(&display_uniform),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
 
-    let camera_bind_group_layout =
+    let display_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -160,21 +152,59 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
                 },
                 count: None,
             }],
-            label: Some("camera_bind_group_layout"),
+            label: Some("display_bind_group_layout"),
         });
 
-    let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &camera_bind_group_layout,
+    let display_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &display_bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: camera_buffer.as_entire_binding(),
+            resource: display_buffer.as_entire_binding(),
         }],
-        label: Some("camera_bind_group"),
+        label: Some("display_bind_group"),
     });
+    // End: display
+
+    // Begin: params
+    let params = Params { t: 0.0 };
+
+    let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Params Buffer"),
+        contents: bytemuck::cast_slice(&[params]),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let params_bind_group_layout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("params_bind_group_layout"),
+        });
+
+    let params_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &params_bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: params_buffer.as_entire_binding(),
+        }],
+        label: Some("params_bind_group"),
+    });
+    // End: params
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[Some(&camera_bind_group_layout)],
+        bind_group_layouts: &[
+            Some(&display_bind_group_layout),
+            Some(&params_bind_group_layout),
+        ],
         immediate_size: 0,
     });
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -216,9 +246,12 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         queue,
         config,
         pipeline,
-        camera_bind_group,
-        camera_buffer,
-        camera_uniform,
+        display_uniform,
+        display_buffer,
+        display_bind_group,
+        params,
+        params_buffer,
+        params_bind_group,
         start_timestamp: std::time::Instant::now(),
     }
 }

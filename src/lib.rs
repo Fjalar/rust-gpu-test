@@ -3,6 +3,7 @@ use winit::event_loop::EventLoop;
 
 mod app;
 mod gpu;
+mod params;
 
 use app::App;
 

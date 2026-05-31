@@ -49,22 +49,18 @@ impl ApplicationHandler for App {
                 gpu.config.width = size.width;
                 gpu.config.height = size.height;
                 gpu.surface.configure(&gpu.device, &gpu.config);
-                gpu.camera_uniform.x = size.width;
-                gpu.camera_uniform.y = size.height;
+                gpu.display_uniform = [size.width, size.height];
                 gpu.queue.write_buffer(
-                    &gpu.camera_buffer,
+                    &gpu.display_buffer,
                     0,
-                    bytemuck::cast_slice(&[gpu.camera_uniform]),
+                    bytemuck::cast_slice(&gpu.display_uniform),
                 );
                 gpu.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
-                gpu.camera_uniform.t = gpu.start_timestamp.elapsed().as_secs_f32();
-                gpu.queue.write_buffer(
-                    &gpu.camera_buffer,
-                    0,
-                    bytemuck::cast_slice(&[gpu.camera_uniform]),
-                );
+                gpu.params.t = gpu.start_timestamp.elapsed().as_secs_f32();
+                gpu.queue
+                    .write_buffer(&gpu.params_buffer, 0, bytemuck::cast_slice(&[gpu.params]));
                 gpu.window.request_redraw();
                 gpu.render();
             }

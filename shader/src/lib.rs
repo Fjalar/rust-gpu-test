@@ -3,9 +3,12 @@
 use spirv_std::glam::{Vec3, Vec4, vec3, vec4};
 use spirv_std::spirv;
 
-pub struct Camera {
+pub struct Display {
     x: u32,
     y: u32,
+}
+
+pub struct Params {
     t: f32,
 }
 
@@ -18,11 +21,12 @@ pub struct Triangle {
 #[spirv(fragment)]
 pub fn main_fs(
     #[spirv(frag_coord)] pos: Vec4,
-    #[spirv(uniform, descriptor_set = 0, binding = 0)] camera: &Camera,
+    #[spirv(uniform, descriptor_set = 0, binding = 0)] display: &Display,
+    #[spirv(uniform, descriptor_set = 1, binding = 0)] params: &Params,
     output: &mut Vec4,
 ) {
-    let half_w = camera.x as f32 / 2.0;
-    let half_h = camera.y as f32 / 2.0;
+    let half_w = display.x as f32 / 2.0;
+    let half_h = display.y as f32 / 2.0;
     let pixel = vec3(pos.x - half_w, pos.y - half_h, 0.0);
     let origin = vec3(0.0, 0.0, -1.0);
     let ray = pixel - origin;
@@ -36,9 +40,9 @@ pub fn main_fs(
     let intersection_point = moller_trumbore_intersection(origin, ray, triangle);
     if intersection_point != Vec3::ZERO {
         *output = vec4(
-            (camera.t % 4.0) * 0.25,
-            (camera.t % 2.0) * 0.5,
-            (camera.t % 1.0) * 1.0,
+            (params.t as f32 % 4.0) * 0.25,
+            (params.t as f32 % 2.0) * 0.5,
+            (params.t as f32 % 1.0) * 1.0,
             1.0,
         );
     } else {
