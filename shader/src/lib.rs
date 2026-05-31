@@ -31,22 +31,29 @@ pub fn main_fs(
     let origin = vec3(0.0, 0.0, -1.0);
     let ray = pixel - origin;
 
-    let triangle = Triangle {
-        a: Vec3::new(0.0, -200.0, 1.0),
-        b: Vec3::new(200.0, 200.0, 1.0),
-        c: Vec3::new(-200.0, 200.0, 1.0),
-    };
+    let triangles = [
+        Triangle {
+            a: Vec3::new(0.0, -200.0, 1.0),
+            b: Vec3::new(200.0, 200.0, 1.0),
+            c: Vec3::new(-200.0, 200.0, 1.0),
+        },
+        Triangle {
+            a: Vec3::new(300.0, 200.0, 1.0),
+            b: Vec3::new(500.0, -200.0, 1.0),
+            c: Vec3::new(100.0, -200.0, 1.0),
+        },
+    ];
 
-    let intersection_point = moller_trumbore_intersection(origin, ray, triangle);
-    if intersection_point != Vec3::ZERO {
-        *output = vec4(
-            (params.t as f32 % 4.0) * 0.25,
-            (params.t as f32 % 2.0) * 0.5,
-            (params.t as f32 % 1.0) * 1.0,
-            1.0,
-        );
-    } else {
-        *output = vec4(0.0, 0.0, 0.0, 1.0);
+    for i in 0..triangles.len() {
+        let intersection_point = moller_trumbore_intersection(origin, ray, &triangles[i]);
+        if intersection_point != Vec3::ZERO {
+            *output = vec4(
+                (params.t as f32 % 4.0) * 0.25,
+                (params.t as f32 % 2.0) * 0.5,
+                (params.t as f32 % 1.0) * 1.0,
+                1.0,
+            );
+        }
     }
 }
 
@@ -64,7 +71,7 @@ pub fn main_vs(
 }
 
 // https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm#Rust_implementation
-fn moller_trumbore_intersection(origin: Vec3, direction: Vec3, triangle: Triangle) -> Vec3 {
+fn moller_trumbore_intersection(origin: Vec3, direction: Vec3, triangle: &Triangle) -> Vec3 {
     let e1 = triangle.b - triangle.a;
     let e2 = triangle.c - triangle.a;
 
