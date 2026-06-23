@@ -5,8 +5,6 @@ use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use crate::params::Params;
 
-const SHADER: &[u8] = include_bytes!(env!("shader.spv"));
-
 pub(crate) struct Gpu {
     pub(crate) instance: wgpu::Instance,
     pub(crate) window: Arc<Window>,
@@ -119,10 +117,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         .await
         .expect("no device");
 
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("shader"),
-        source: wgpu::util::make_spirv(SHADER),
-    });
+    let module = device.create_shader_module(wgpu::include_spirv!(env!("SHADER_SPV_PATH")));
 
     let size = window.inner_size();
     let mut config = surface

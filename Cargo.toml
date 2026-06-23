@@ -1,21 +1,32 @@
-[package]
-name = "rust-gpu-test"
+[workspace]
+members = [
+    "rust-gpu-test",
+    "shaders"
+]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
+authors = ["Fjalar <fjalarhognason@gmail.com>"]
 edition = "2024"
-default-run = "rust-gpu-test"
+license = "MIT"
+repository = ""
 
-[dependencies]
-wgpu = { version = "29.0.3", features = ["spirv"] }
+[workspace.lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(target_arch, values("spirv"))'] }
+
+[workspace.dependencies]
+# API
+wgpu = { version = "29.0.1", default-features = false, features = ["std", "vulkan", "vulkan-portability", "spirv"] }
 pollster = "0.4.0"
-bytemuck = "1.25.0"
-winit = "0.30.13"
 
-[build-dependencies]
-spirv-builder = { version = "0.10.0-alpha.1", default-features = false, features = ["use-compiled-tools"] }
+# rust-gpu
+# While `cargo-gpu` is backwards compatible with older rust-gpu versions, easiest is to just match the versions exactly.
+cargo-gpu-install = { version = "0.10.0-alpha.1" }
+spirv-std = { version = "0.10.0-alpha.1" }
 
-# Compile build-dependencies in release-ish mode so rustc_codegen_spirv isn't dog slow.
-[profile.dev.build-override]
-opt-level = 3
-[profile.release.build-override]
-opt-level = 3
-codegen-units = 16
+# other
+glam = { version = "0.33.0", default-features = false, features = ["u32", "i32", "f64"] }
+bytemuck = { version = "1.24.0", features = ["derive"] }
+winit = "0.30.0"
+anyhow = "1.0.98"
