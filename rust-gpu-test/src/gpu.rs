@@ -103,6 +103,7 @@ impl Gpu {
             });
             blit_pass.set_pipeline(&self.blit_pipeline);
             blit_pass.set_bind_group(0, &self.blit_bind_group, &[]);
+            blit_pass.set_bind_group(1, &self.display_bind_group, &[]);
             blit_pass.draw(0..3, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
@@ -336,7 +337,10 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     });
     let blit_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Blit pipeline layout"),
-        bind_group_layouts: &[Some(&blit_bind_group_layout)],
+        bind_group_layouts: &[
+            Some(&blit_bind_group_layout),
+            Some(&display_bind_group_layout),
+        ],
         immediate_size: 0,
     });
     let blit_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
