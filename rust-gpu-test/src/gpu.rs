@@ -15,9 +15,12 @@ pub(crate) struct Gpu {
     pub(crate) queue: wgpu::Queue,
     pub(crate) config: wgpu::SurfaceConfiguration,
     pub(crate) blit_pipeline: wgpu::RenderPipeline,
+    pub(crate) blit_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) blit_bind_group: BindGroup,
     pub(crate) compute_pipeline: wgpu::ComputePipeline,
+    pub(crate) raytracing_view_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) raytracing_view_bind_group: BindGroup,
+    pub(crate) sampler: wgpu::Sampler,
     pub(crate) display_uniform: [u32; 2],
     pub(crate) display_buffer: wgpu::Buffer,
     pub(crate) display_bind_group: BindGroup,
@@ -75,11 +78,8 @@ impl Gpu {
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, Some(&self.raytracing_view_bind_group), &[]);
             compute_pass.set_bind_group(1, Some(&self.display_bind_group), &[]);
-            compute_pass.dispatch_workgroups(
-                self.display_uniform[0] / 16,
-                self.display_uniform[1] / 16,
-                1,
-            );
+            compute_pass.set_bind_group(2, Some(&self.params_bind_group), &[]);
+            compute_pass.dispatch_workgroups(self.display_uniform[0], self.display_uniform[1], 1);
         }
         {
             let mut blit_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -110,6 +110,43 @@ impl Gpu {
         self.window.pre_present_notify();
         frame.present();
     }
+}
+
+pub(crate) fn create_storage_texture(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+) -> wgpu::TextureView {
+    let hdr_format = wgpu::TextureFormat::Rgba16Float;
+
+    let raytracing_target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Raytracing target"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: hdr_format,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+        view_formats: &[hdr_format],
+    });
+
+    let raytracing_view = raytracing_target.create_view(&wgpu::TextureViewDescriptor {
+        label: Some("Raytracing view"),
+        format: Some(hdr_format),
+        dimension: Some(wgpu::TextureViewDimension::D2),
+        usage: None,
+        aspect: wgpu::TextureAspect::All,
+        base_mip_level: 0,
+        mip_level_count: None,
+        base_array_layer: 0,
+        array_layer_count: None,
+    });
+
+    raytracing_view
 }
 
 pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
@@ -146,34 +183,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     surface.configure(&device, &config);
 
     // Begin: target
-    let hdr_format = wgpu::TextureFormat::Rgba16Float;
-
-    let raytracing_target = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Raytracing target"),
-        size: wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: hdr_format,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
-        view_formats: &[hdr_format],
-    });
-
-    let raytracing_view = raytracing_target.create_view(&wgpu::TextureViewDescriptor {
-        label: Some("Raytracing view"),
-        format: Some(hdr_format),
-        dimension: Some(wgpu::TextureViewDimension::D2),
-        usage: None,
-        aspect: wgpu::TextureAspect::All,
-        base_mip_level: 0,
-        mip_level_count: None,
-        base_array_layer: 0,
-        array_layer_count: None,
-    });
+    let raytracing_view = create_storage_texture(&device, config.width, config.height);
 
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Raytracing sampler"),
@@ -234,7 +244,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -285,6 +295,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         bind_group_layouts: &[
             Some(&raytracing_view_bind_group_layout),
             Some(&display_bind_group_layout),
+            Some(&params_bind_group_layout),
         ],
         immediate_size: 0,
     });
@@ -384,8 +395,11 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
         queue,
         config,
         blit_pipeline,
+        blit_bind_group_layout,
         blit_bind_group,
+        raytracing_view_bind_group_layout,
         raytracing_view_bind_group,
+        sampler,
         compute_pipeline,
         display_uniform,
         display_buffer,

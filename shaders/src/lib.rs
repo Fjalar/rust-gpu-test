@@ -1,6 +1,6 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
 
-use glam::{Vec4Swizzles, ivec2, uvec2, vec2};
+use glam::{Vec3Swizzles, vec2};
 use spirv_std::glam::UVec3;
 use spirv_std::glam::{Vec3, Vec4, vec3, vec4};
 use spirv_std::{Image, Sampler, spirv};
@@ -20,95 +20,63 @@ pub struct Triangle {
     c: Vec3,
 }
 
-#[spirv(compute(threads(16, 16, 1)))]
+#[spirv(compute(threads(1, 1, 1)))]
 pub fn main_cs(
     #[spirv(global_invocation_id)] id: UVec3,
     #[spirv(descriptor_set = 0, binding = 0)] image: &Image!(2D, format = rgba16f, sampled = false),
     #[spirv(uniform, descriptor_set = 1, binding = 0)] display: &Display,
+    #[spirv(uniform, descriptor_set = 2, binding = 0)] params: &Params,
 ) {
-    // let index = id.x as usize + display.x as usize + display.y as usize;
-    // let triangles = [
-    //     Triangle {
-    //         a: Vec3::new(0.0, -200.0, 1.0),
-    //         b: Vec3::new(200.0, 200.0, 1.0),
-    //         c: Vec3::new(-200.0, 200.0, 1.0),
-    //     },
-    //     Triangle {
-    //         a: Vec3::new(300.0, 200.0, 1.0),
-    //         b: Vec3::new(500.0, -200.0, 1.0),
-    //         c: Vec3::new(100.0, -200.0, 1.0),
-    //     },
-    // ];
+    let pixel_center =
+        vec2(id.x as f32, id.y as f32) - vec2(0.5 * display.x as f32, 0.5 * display.y as f32);
+    // let pixel = vec3(id.x as f32 - half_w, id.y as f32 - half_h, 0.0);
+    let pixel = pixel_center.extend(0.0);
+    let origin = vec3(0.0, 0.0, -1.0);
+    let ray = pixel - origin;
+    let triangles = [
+        Triangle {
+            a: Vec3::new(0.0, -200.0, 1.0),
+            b: Vec3::new(200.0, 200.0, 1.0),
+            c: Vec3::new(-200.0, 200.0, 1.0),
+        },
+        Triangle {
+            a: Vec3::new(300.0, 200.0, 1.0),
+            b: Vec3::new(500.0, -200.0, 1.0),
+            c: Vec3::new(100.0, -200.0, 1.0),
+        },
+    ];
 
-    // for i in 0..triangles.len() {
-    //     let intersection_point = moller_trumbore_intersection(origin, ray, &triangles[i]);
-    //     if intersection_point != Vec3::ZERO {
-    //         *output = vec4(
-    //             (params.t as f32 % 4.0) * 0.25,
-    //             (params.t as f32 % 2.0) * 0.5,
-    //             (params.t as f32 % 1.0) * 1.0,
-    //             1.0,
-    //         );
-    //     }
-    unsafe {
-        image.write(
-            uvec2(id.x as u32, id.y as u32),
-            vec4(
-                id.x as f32 / display.x as f32,
-                id.y as f32 / display.y as f32,
-                0.0 as f32,
+    let mut color = vec4(0.0, 0.0, 0.0, 1.0);
+
+    for i in 0..triangles.len() {
+        let intersection_point = moller_trumbore_intersection(origin, ray, &triangles[i]);
+        if intersection_point != Vec3::ZERO {
+            color = vec4(
+                (params.t as f32 % 4.0) * 0.25,
+                (params.t as f32 % 2.0) * 0.5,
+                (params.t as f32 % 1.0) * 1.0,
                 1.0,
-            ),
-        );
+            );
+        }
+    }
+    unsafe {
+        image.write(id.xy(), color);
     }
 }
 
 #[spirv(fragment)]
 pub fn main_fs(
     #[spirv(frag_coord)] pos: Vec4,
-    // #[spirv(uniform, descriptor_set = 0, binding = 0)] display: &Display,
-    // #[spirv(uniform, descriptor_set = 1, binding = 0)] params: &Params,
     #[spirv(descriptor_set = 0, binding = 0)] image: &Image!(2D, format = rgba16f, sampled),
     #[spirv(descriptor_set = 0, binding = 1)] sampler: &Sampler,
     #[spirv(uniform, descriptor_set = 1, binding = 0)] display: &Display,
     output: &mut Vec4,
 ) {
-    // let half_w = display.x as f32 / 2.0;
-    // let half_h = display.y as f32 / 2.0;
-    // let pixel = vec3(pos.x - half_w, pos.y - half_h, 0.0);
-    // let origin = vec3(0.0, 0.0, -1.0);
-    // let ray = pixel - origin;
-
     let color: Vec4 = image.sample(
         *sampler,
         vec2(pos.x / display.x as f32, pos.y / display.y as f32),
     );
-    *output = color.xyz().extend(1.0);
-
-    // let triangles = [
-    //     Triangle {
-    //         a: Vec3::new(0.0, -200.0, 1.0),
-    //         b: Vec3::new(200.0, 200.0, 1.0),
-    //         c: Vec3::new(-200.0, 200.0, 1.0),
-    //     },
-    //     Triangle {
-    //         a: Vec3::new(300.0, 200.0, 1.0),
-    //         b: Vec3::new(500.0, -200.0, 1.0),
-    //         c: Vec3::new(100.0, -200.0, 1.0),
-    //     },
-    // ];
-
-    // for i in 0..triangles.len() {
-    //     let intersection_point = moller_trumbore_intersection(origin, ray, &triangles[i]);
-    //     if intersection_point != Vec3::ZERO {
-    //         *output = vec4(
-    //             (params.t as f32 % 4.0) * 0.25,
-    //             (params.t as f32 % 2.0) * 0.5,
-    //             (params.t as f32 % 1.0) * 1.0,
-    //             1.0,
-    //         );
-    //     }
-    // }
+    *output = color;
 }
 
 #[spirv(vertex)]

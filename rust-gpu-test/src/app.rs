@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use wgpu::BindGroupDescriptor;
 use winit::{
     application::ApplicationHandler,
     event::{KeyEvent, WindowEvent},
@@ -8,7 +9,7 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::gpu::Gpu;
+use crate::gpu::{self, Gpu};
 
 #[derive(Default)]
 pub(crate) struct App {
@@ -55,6 +56,31 @@ impl ApplicationHandler for App {
                     0,
                     bytemuck::cast_slice(&gpu.display_uniform),
                 );
+                let new_raytracing_view =
+                    &gpu::create_storage_texture(&gpu.device, gpu.config.width, gpu.config.height);
+                gpu.raytracing_view_bind_group =
+                    gpu.device.create_bind_group(&BindGroupDescriptor {
+                        label: Some("Raytracing view bind group"),
+                        layout: &gpu.raytracing_view_bind_group_layout,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(new_raytracing_view),
+                        }],
+                    });
+                gpu.blit_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Blit bind group"),
+                    layout: &gpu.blit_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(new_raytracing_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&gpu.sampler),
+                        },
+                    ],
+                });
                 gpu.window.request_redraw();
             }
             WindowEvent::RedrawRequested => {
