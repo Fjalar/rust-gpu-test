@@ -5,8 +5,6 @@ use wgpu::{
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
-use crate::params::Params;
-
 pub(crate) struct Gpu {
     pub(crate) instance: wgpu::Instance,
     pub(crate) window: Arc<Window>,
@@ -21,10 +19,10 @@ pub(crate) struct Gpu {
     pub(crate) raytracing_view_bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) raytracing_view_bind_group: BindGroup,
     pub(crate) sampler: wgpu::Sampler,
-    pub(crate) display_uniform: [u32; 2],
+    pub(crate) display_uniform: shaders::shared::Display,
     pub(crate) display_buffer: wgpu::Buffer,
     pub(crate) display_bind_group: BindGroup,
-    pub(crate) params: Params,
+    pub(crate) params: shaders::shared::Params,
     pub(crate) params_buffer: wgpu::Buffer,
     pub(crate) params_bind_group: wgpu::BindGroup,
     pub(crate) start_timestamp: std::time::Instant,
@@ -79,7 +77,11 @@ impl Gpu {
             compute_pass.set_bind_group(0, Some(&self.raytracing_view_bind_group), &[]);
             compute_pass.set_bind_group(1, Some(&self.display_bind_group), &[]);
             compute_pass.set_bind_group(2, Some(&self.params_bind_group), &[]);
-            compute_pass.dispatch_workgroups(self.display_uniform[0], self.display_uniform[1], 1);
+            compute_pass.dispatch_workgroups(
+                self.display_uniform.width,
+                self.display_uniform.height,
+                1,
+            );
         }
         {
             let mut blit_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -198,11 +200,14 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     // End: target
 
     // Begin: display
-    let display_uniform = [size.width, size.height];
+    let display_uniform = shaders::shared::Display {
+        width: size.width,
+        height: size.height,
+    };
 
     let display_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Display Buffer"),
-        contents: bytemuck::cast_slice(&display_uniform),
+        contents: bytemuck::cast_slice(&[display_uniform]),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
 
@@ -232,7 +237,7 @@ pub(crate) async fn init(window: Arc<Window>, el: &ActiveEventLoop) -> Gpu {
     // End: display
 
     // Begin: params
-    let params = Params { t: 0.0 };
+    let params = shaders::shared::Params { t: 0.0 };
 
     let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Params Buffer"),

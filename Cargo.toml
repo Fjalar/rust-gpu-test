@@ -26,7 +26,7 @@ cargo-gpu-install = { version = "0.10.0-alpha.1" }
 spirv-std = { version = "0.10.0-alpha.1" }
 
 # other
-glam = { version = "0.33.0", default-features = false, features = ["u32", "i32", "f64"] }
+glam = { version = "0.33.0", default-features = false, features = ["u32", "i32", "f64", "bytemuck"] }
 bytemuck = { version = "1.24.0", features = ["derive"] }
 winit = "0.30.0"
 anyhow = "1.0.98"

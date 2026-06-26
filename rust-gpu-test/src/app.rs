@@ -50,11 +50,14 @@ impl ApplicationHandler for App {
                 gpu.config.width = size.width;
                 gpu.config.height = size.height;
                 gpu.surface.configure(&gpu.device, &gpu.config);
-                gpu.display_uniform = [size.width, size.height];
+                gpu.display_uniform = shaders::shared::Display {
+                    width: size.width,
+                    height: size.height,
+                };
                 gpu.queue.write_buffer(
                     &gpu.display_buffer,
                     0,
-                    bytemuck::cast_slice(&gpu.display_uniform),
+                    bytemuck::cast_slice(&[gpu.display_uniform]),
                 );
                 let new_raytracing_view =
                     &gpu::create_storage_texture(&gpu.device, gpu.config.width, gpu.config.height);

@@ -1,24 +1,13 @@
 #![cfg_attr(target_arch = "spirv", no_std)]
 
+pub mod shared;
+
 use glam::{Vec3Swizzles, vec2};
 use spirv_std::glam::UVec3;
 use spirv_std::glam::{Vec3, Vec4, vec3, vec4};
 use spirv_std::{Image, Sampler, spirv};
 
-pub struct Display {
-    x: u32,
-    y: u32,
-}
-
-pub struct Params {
-    t: f32,
-}
-
-pub struct Triangle {
-    a: Vec3,
-    b: Vec3,
-    c: Vec3,
-}
+use crate::shared::{Display, Params, Triangle};
 
 #[spirv(compute(threads(1, 1, 1)))]
 pub fn main_cs(
@@ -27,8 +16,8 @@ pub fn main_cs(
     #[spirv(uniform, descriptor_set = 1, binding = 0)] display: &Display,
     #[spirv(uniform, descriptor_set = 2, binding = 0)] params: &Params,
 ) {
-    let pixel_center =
-        vec2(id.x as f32, id.y as f32) - vec2(0.5 * display.x as f32, 0.5 * display.y as f32);
+    let pixel_center = vec2(id.x as f32, id.y as f32)
+        - vec2(0.5 * display.width as f32, 0.5 * display.height as f32);
     // let pixel = vec3(id.x as f32 - half_w, id.y as f32 - half_h, 0.0);
     let pixel = pixel_center.extend(0.0);
     let origin = vec3(0.0, 0.0, -1.0);
@@ -74,7 +63,7 @@ pub fn main_fs(
 ) {
     let color: Vec4 = image.sample(
         *sampler,
-        vec2(pos.x / display.x as f32, pos.y / display.y as f32),
+        vec2(pos.x / display.width as f32, pos.y / display.height as f32),
     );
     *output = color;
 }
